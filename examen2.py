@@ -124,9 +124,3 @@ class RecordViewer(tk.Tk):
                                 f"Dorsal: {random_record.get('dorsal', 'N/A')}")
         else:
             messagebox.showwarning("Advertencia", "No hay registros disponibles.")
-
-if __name__ == "__main__":
-    base_url = "https://67203872e7a5792f0530cc8c.mockapi.io/eq"
-    api = API(base_url)
-    app = RecordViewer(api)
-    app.mainloop()
