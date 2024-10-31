@@ -4,123 +4,102 @@ import urllib.request
 import json
 import random
 
-class API:
-    """Clase para interactuar con la API y obtener registros."""
-    def __init__(self, base_url):
-        self.__base_url = base_url
+def fetch_records(base_url):
+    """Obtiene todos los registros desde la API."""
+    try:
+        with urllib.request.urlopen(base_url) as response:
+            data = response.read().decode('utf-8')
+            return json.loads(data)
+    except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        print(f"Error en la solicitud: {e}")
+        return []
 
-    def fetch_records(self):
-        """Obtiene todos los registros desde la API."""
-        try:
-            with urllib.request.urlopen(self.__base_url) as response:
-                data = response.read().decode('utf-8')  # Decodificar los datos
-                return json.loads(data)  # Procesar datos como JSON
-        except (urllib.error.HTTPError, urllib.error.URLError) as e:
-            print(f"Error en la solicitud: {e}")  # Imprime el error en la consola
-            return []
+def setup_treeview(tree):
+    """Configura las columnas del Treeview."""
+    for col in tree["columns"]:
+        tree.heading(col, text=col.capitalize())
 
-class RecordViewer(tk.Tk):
-    """Clase principal de la aplicación que muestra los registros."""
-    def __init__(self, api):
-        super().__init__()
-        self.__api = api
-        self.__records = self.__api.fetch_records()  # Carga los registros una vez
-        self.__init_ui()
-        self.__load_records()
+def load_records(tree, records):
+    """Carga los registros desde la API y los muestra en el Treeview."""
+    clear_treeview(tree)
+    if records:
+        for record in records:
+            insert_record(tree, record)
+    else:
+        messagebox.showwarning("Advertencia", "No se pudieron cargar los registros.")
 
-    def __init_ui(self):
-        """Inicializa la interfaz gráfica."""
-        self.title("Historial de Corredores de F1")
-        self.geometry("800x400")
-        self.resizable(False, False)
+def clear_treeview(tree):
+    for item in tree.get_children():
+        tree.delete(item)
 
-        self.__tree = ttk.Treeview(self, columns=("equipo", "nacimiento", "nombre", "nacionalidad", "edad", "dorsal"), show="headings")
-        self.__setup_treeview()
-        self.__tree.pack(expand=True, fill='both')  # Agregar el Treeview a la ventana
+def insert_record(tree, record):
+    values = (
+        record.get('id', 'N/A'),
+        record.get('equipo', 'N/A'),
+        record.get('nombre', 'N/A'),
+        record.get('nacionalidad', 'N/A'),
+        record.get('puntuacion', 'N/A'),
+        record.get('accidentes', 'N/A'),
+    )
+    tree.insert("", "end", values=values)
 
-        # Botón para buscar un corredor por nombre
-        self.__search_button = tk.Button(self, text="Buscar Corredor", command=self.__input_search)
-        self.__search_button.pack(pady=10)
+def search_record(tree, records, search_entry):
+    id = search_entry.get()
+    found = False
+    clear_treeview(tree)
 
-        # Botón para mostrar un corredor aleatorio
-        self.__random_button = tk.Button(self, text="Mostrar Corredor Aleatorio", command=self.__show_random_record)
-        self.__random_button.pack(pady=10)
+    for record in records:
+        if record.get('id', '') == id:
+            found = True
+            insert_record(tree, record)
+            break
 
-    def __setup_treeview(self):
-        """Configura las columnas del Treeview."""
-        for col in self.__tree["columns"]:
-            self.__tree.heading(col, text=col.capitalize())
+    if not found:
+        messagebox.showwarning("Advertencia", "Corredor no encontrado.")
 
-    def __load_records(self):
-        """Carga los registros desde la API y los muestra en el Treeview."""
-        self.__clear_treeview()
+def show_random_record(tree, records):
+    """Muestra un corredor aleatorio en el Treeview."""
+    if records:
+        random_record = random.choice(records)
+        clear_treeview(tree)
+        insert_record(tree, random_record)
+    else:
+        messagebox.showwarning("Advertencia", "No hay registros disponibles.")
 
-        if self.__records:
-            for record in self.__records:
-                self.__insert_record(record)
-        else:
-            messagebox.showwarning("Advertencia", "No se pudieron cargar los registros.")
+def update_records(api_url, tree, records):
+    """Actualiza los registros desde la API."""
+    records = fetch_records(api_url)
+    load_records(tree, records)
+    return records
 
-    def __clear_treeview(self):
-        """Limpia el Treeview de registros anteriores."""
-        for item in self.__tree.get_children():
-            self.__tree.delete(item)
+def main():
+    base_url = "https://67203872e7a5792f0530cc8c.mockapi.io/eq"
+    records = fetch_records(base_url)
 
-    def __insert_record(self, record):
-        """Inserta un registro en el Treeview."""
-        values = (
-            record.get('equipo', 'N/A'),
-            record.get('nacimiento', 'N/A'),
-            record.get('nombre', 'N/A'),
-            record.get('nacionalidad', 'N/A'),
-            record.get('edad', 'N/A'),
-            record.get('dorsal', 'N/A')
-        )
-        self.__tree.insert("", "end", values=values)
+    root = tk.Tk()
+    root.title("Historial de Corredores de F1")
+    root.geometry("1340x400")
+    root.resizable(False, False)
 
-    def __input_search(self):
-        """Abre una ventana para buscar un corredor por nombre."""
-        search_window = tk.Toplevel(self)
-        search_window.title("Buscar Corredor")
-        search_window.geometry("300x100")
+    search_entry = tk.Entry(root)
+    search_entry.pack(pady=10)
 
-        tk.Label(search_window, text="Ingresa el nombre del corredor:").pack(pady=10)
-        entry = tk.Entry(search_window)
-        entry.pack(pady=5)
+    search_button = tk.Button(root, text="Buscar Corredor por ID", command=lambda: search_record(tree, records, search_entry))
+    search_button.pack(pady=5)
 
-        tk.Button(search_window, text="Buscar", command=lambda: self.__search_record(entry.get(), search_window)).pack(pady=10)
+    tree = ttk.Treeview(root, columns=("id", "equipo", "nombre", "nacionalidad", "puntuacion", "accidentes"), show="headings")
+    setup_treeview(tree)
+    tree.pack(expand=True, fill='both')
 
-    def __search_record(self, name, search_window):
-        """Busca un corredor por nombre y lo muestra en un mensaje."""
-        found = False
+    random_button = tk.Button(root, text="Mostrar Corredor Aleatorio", command=lambda: show_random_record(tree, records))
+    random_button.pack(pady=10)
 
-        for record in self.__records:
-            if record.get('nombre', '').lower() == name.lower():
-                found = True
-                messagebox.showinfo("Detalles del Corredor",
-                                    f"Equipo: {record.get('equipo', 'N/A')}\n"
-                                    f"Nacimiento: {record.get('nacimiento', 'N/A')}\n"
-                                    f"Nombre: {record.get('nombre', 'N/A')}\n"
-                                    f"Nacionalidad: {record.get('nacionalidad', 'N/A')}\n"
-                                    f"Edad: {record.get('edad', 'N/A')}\n"
-                                    f"Dorsal: {record.get('dorsal', 'N/A')}")
-                break
+    refresh_button = tk.Button(root, text="Actualizar Registros", command=lambda: update_records(base_url, tree, records))
+    refresh_button.pack(pady=10)
 
-        if not found:
-            messagebox.showwarning("Advertencia", "Corredor no encontrado.")
+    load_records(tree, records)
 
-        search_window.destroy()
+    root.mainloop()
 
-    def __show_random_record(self):
-        """Muestra un corredor aleatorio en un mensaje."""
-        if self.__records:
-            random_record = random.choice(self.__records)
-            messagebox.showinfo("Corredor Aleatorio",
-                                f"Equipo: {random_record.get('equipo', 'N/A')}\n"
-                                f"Nacimiento: {random_record.get('nacimiento', 'N/A')}\n"
-                                f"Nombre: {random_record.get('nombre', 'N/A')}\n"
-                                f"Nacionalidad: {random_record.get('nacionalidad', 'N/A')}\n"
-                                f"Edad: {random_record.get('edad', 'N/A')}\n"
-                                f"Dorsal: {random_record.get('dorsal', 'N/A')}")
-        else:
-            messagebox.showwarning("Advertencia", "No hay registros disponibles.")
+
+main()
